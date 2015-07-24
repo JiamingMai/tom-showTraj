@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Maven: org.bytedeco:javacv:0.9">
+    <CLASSES />
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/org/bytedeco/javacv/0.9/javacv-0.9-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/bytedeco/javacv/0.9/javacv-0.9-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

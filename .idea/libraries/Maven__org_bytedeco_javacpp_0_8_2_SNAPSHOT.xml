@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Maven: org.bytedeco:javacpp:0.8-2-SNAPSHOT">
+    <CLASSES />
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/org/bytedeco/javacpp/0.8-2-SNAPSHOT/javacpp-0.8-2-SNAPSHOT-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/bytedeco/javacpp/0.8-2-SNAPSHOT/javacpp-0.8-2-SNAPSHOT-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
