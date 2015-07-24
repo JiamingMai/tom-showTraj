@@ -49,7 +49,7 @@ public class General {
         String filePriors = inputFilePath + "encode_codebook\\codebook256_f\\validation50.score.gmm.priors";
         String modelFile = inputFilePath + "kth_model_row.model";
 
-        String dataFile = inputFilePath + "trajsTest\\person21_boxing_d1_uncomp.txt";
+        String dataFileFolder = inputFilePath + "trajsTest";
 
         int numDimension = 288;
         int numCluster = 256;
@@ -69,10 +69,7 @@ public class General {
 	elseif ~isempty(strfind(datalist(i).name,'running')) classids(i)=5;
 	elseif ~isempty(strfind(datalist(i).name,'walking')) classids(i)=6;
  */
-        for (int i = 0; i < 6; i++) {
-            double dis = innerProduct(fv_data, trainingResult.get(i));
-            System.out.println("i: " + i + ", dis: " + dis);
-        }
+        check(dataFileFolder, trainingResult, means, numDimension,  numCluster, covs, priors, 0);
     }
 
     public static double check(String testFileFolder, List<double[]> trainingResult,
@@ -86,19 +83,57 @@ public class General {
         for (int i = 0; i < listOfFiles.length; i++) {
             File f = listOfFiles[i];
             if (f.isFile()) {
-                totalCnt++;
                 int orgClassID = getClassID(f.getName());
-                double[] fv_data = getFvData(f.getName(), means, numDimension, numCluster, covs, priors, flags);
-                int testClassID =
+                if (orgClassID < 0){
+                    System.out.println("Warning, in check, orgClassID < 0, fileName: " + f.getName());
+                    continue;
+                }
+
+                totalCnt++;
+                double[] fv_data = getFvData(f.getAbsolutePath(), means, numDimension, numCluster, covs, priors, flags, 167, 243);
+                Object[] classifyRestult = getClassificationResult(trainingResult, fv_data);
+                int testClassID = (int)classifyRestult[0];
+                double similarity = (double)classifyRestult[1];
+                if (orgClassID == testClassID){
+                    accCnt ++;
+                    System.out.println("File: " + f.getName() + ", orgClassID: " + orgClassID + ", testID: " + testClassID + ", sim: " + similarity);
+                } else {
+                    System.out.println("Wrong classification, File: " + f.getName() + ", orgClassID: " + orgClassID + ", testID: " + testClassID + ", sim: " + similarity);
+                }
+            }
+        }
+        acc = totalCnt == 0? 0.0: (double)accCnt / (double)totalCnt;
+        System.out.println("totalCnt: " + totalCnt + ", accCnt: " + accCnt + ", accuracy: " + acc);
+        return acc;
+    }
+
+    public static Object[] getClassificationResult(List<double[]> trainingResult, double[] fv_data){
+        int maxIndex = 0;
+        double maxSimilarity = Double.NEGATIVE_INFINITY;
+
+        for (int i = 0; i < trainingResult.size(); i++) {
+            double sim = innerProduct(fv_data, trainingResult.get(i));
+            if (sim > maxSimilarity){
+                maxSimilarity = sim;
+                maxIndex = i;
             }
         }
 
-        return acc;
+        return new Object[] {maxIndex, maxSimilarity};
     }
 
     public static double[] getFvData(
             String dataFile, double[] means, int numDimension, int numCluster, double[] covs, double[] priors, int flags){
         double[] data = getTrajDataWithNormalization(dataFile, 327);
+        int numData = data.length / numDimension;
+
+        Object[] enc = vl_fisher_encode_double(means, numDimension, numCluster, covs, priors, data, numData, flags);
+        return (double[]) enc[0];
+    }
+
+    public static double[] getFvData(
+            String dataFile, double[] means, int numDimension, int numCluster, double[] covs, double[] priors, int flags, int startFrameID, int endFrameID){
+        double[] data = getTrajDataWithNormalization(dataFile, 327, startFrameID, endFrameID);
         int numData = data.length / numDimension;
 
         Object[] enc = vl_fisher_encode_double(means, numDimension, numCluster, covs, priors, data, numData, flags);
@@ -219,6 +254,67 @@ public class General {
                 if (checkLength > 0 && dList.size() != checkLength) {
                     System.out.println("warning, dList.size() != checkLength, " + dList.size() + ", " + checkLength);
                 }
+
+                double sum = 0.0;
+                for (int i = 0; i < dList.size(); i++) {
+                    if (i >= 39) {
+                        double p = Math.sqrt(Math.abs(dList.get(i)));
+                        p = dList.get(i) > 0.0 ? p : -p;
+                        sum += p * p;
+                        dList.set(i, p);
+                    }
+                }
+
+                double base = Math.sqrt(sum);
+                ///only remain the
+                for (int i = 0; i < dList.size(); i++) {
+                    if (i >= 39) {
+                        if (base > 0.0) {
+                            dataList.add(dList.get(i) / base);
+                        } else {
+                            dataList.add(dList.get(i));
+                        }
+                    }
+                }
+            }
+            myfile.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("LineCount: " + lineCount + ", total data size: " + dataList.size());
+        double[] retVal = new double[dataList.size()];
+        for (int i = 0; i < dataList.size(); i++) {
+            retVal[i] = dataList.get(i).doubleValue();
+        }
+        return retVal;
+    }
+
+    public static double[] getTrajDataWithNormalization(String fileName, int checkLength, int startFrameID, int endFrameID) {
+        List<Double> dataList = new ArrayList<>();
+        int lineCount = 0;
+        try {
+            BufferedReader myfile = new BufferedReader(new FileReader(fileName));
+            String rdLine = null;
+            while ((rdLine = myfile.readLine()) != null) {
+                List<Double> dList = new ArrayList<>();
+                String[] rdLineSplit = rdLine.split(" ");
+                for (int i = 0; i < rdLineSplit.length; i++) {
+                    if (!rdLineSplit[i].trim().isEmpty()) {
+                        dList.add(Double.parseDouble(rdLineSplit[i].trim()));
+                    }
+                }
+
+                if (checkLength > 0 && dList.size() != checkLength) {
+                    System.out.println("warning, dList.size() != checkLength, " + dList.size() + ", " + checkLength);
+                }
+
+                int frameID = (int)dList.get(0).intValue();
+                if (frameID < startFrameID || frameID > endFrameID){
+                    continue;
+                }
+
+                lineCount++;
 
                 double sum = 0.0;
                 for (int i = 0; i < dList.size(); i++) {
