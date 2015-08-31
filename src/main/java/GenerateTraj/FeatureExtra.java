@@ -1,30 +1,16 @@
 package GenerateTraj;
 
-import java.awt.image.BufferedImage;
 import java.io.*;
-import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.*;
 import java.util.Arrays;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-
-import com.jmatio.io.MatFileReader;
-import com.jmatio.types.MLCell;
-import com.jmatio.types.MLDouble;
-
-//import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.*;
-import org.bytedeco.javacv.FFmpegFrameGrabber;
-import org.bytedeco.javacv.FrameGrabber;
+import org.bytedeco.javacv.FrameRecorder;
 
 import static org.bytedeco.javacpp.opencv_core.*;
 import static org.bytedeco.javacpp.opencv_core.cvCreateImage;
 import static org.bytedeco.javacpp.opencv_highgui.*;
 
-import javax.imageio.ImageIO;
-import javax.swing.text.Utilities;
 
 /**
  * Created by Tom.fu on 28/11/2014.
@@ -53,7 +39,7 @@ public class FeatureExtra {
     static float scale_stride = (float) Math.sqrt(2.0);
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws FrameRecorder.Exception {
         //String sourceVideoFile = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\testdata2\\";
         //String outputTxtPath = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\testdata2\\newResults2.txt";
         //int start_frame_no = 1;
@@ -70,19 +56,48 @@ public class FeatureExtra {
 
         int drawIndicator = toDraw == true ? 1 : 0;
 
+        String fileName = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\testdata2\\showTraj_3-13.mp4";
+
         //min_distance = Double.parseDouble(args[0]);
         //init_gap = Integer.parseInt(args[1]);
         //end_frame_no = Integer.parseInt(args[3]);
 
         long startTime = System.currentTimeMillis();
         System.out.println("new test, start at: " + startTime);
-        FeatureDetectTrackingExtraction(drawIndicator, sourceVideoFile, outputTxtPath, filePrefix, w, h);
+        batchExtractingProcess(drawIndicator, sourceVideoFile + "boxing\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "handclapping\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "handwaving\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "jogging\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "running\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "walking\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "walking2\\", outputTxtPath, filePrefix, w, h, null);
+
         long endTime = System.currentTimeMillis();
         System.out.println("finished with duration: " + (endTime - startTime));
     }
 
+    public static void batchExtractingProcess(
+            int show_track, String sourceRootVideoFolder, String outputFileFolder,
+            String filePrefix, int w, int h, String recordFile) throws FrameRecorder.Exception{
+
+        File folder = new File(sourceRootVideoFolder);
+        File[] listOfFiles = folder.listFiles();
+        int totalDicCnt = 0;
+        for (int i = 0; i < listOfFiles.length; i ++){
+            File f = listOfFiles[i];
+            if (f.isDirectory()) {
+                totalDicCnt ++;
+                String inputFolder = sourceRootVideoFolder + f.getName() + "\\";
+                String outputFileName = outputFileFolder + f.getName() + ".txt";
+                FeatureDetectTrackingExtraction(show_track, inputFolder, outputFileName, filePrefix, w, h, null);
+            }
+        }
+        System.out.println("finishedRootFolder: " + sourceRootVideoFolder + ", totalTargetDicCnt: " + totalDicCnt);
+    }
+
+    //Fixed a bug on Aug 5, 2015, mbhY info to file, the indexOfTraceNode is not ++
     public static void FeatureDetectTrackingExtraction(
-            int show_track, String sourceVideoFolder, String outputFile, String filePrefix, int w, int h) {
+            int show_track, String sourceVideoFolder, String outputFile, String filePrefix, int w, int h, String recordFile) throws FrameRecorder.Exception {
 
         opencv_core.IplImage frame = null;
         opencv_core.IplImage image = null;
@@ -110,12 +125,22 @@ public class FeatureExtra {
         File[] listOfFiles = folder.listFiles();
         int start_frame_no = 1;
         int end_frame_no = listOfFiles.length;
-        System.out.println("the input folder: " + sourceVideoFolder + " has totally files: " + end_frame_no);
+        System.out.println("the input folder: " + sourceVideoFolder + " has totally files: " + end_frame_no + ", outputFile: " + outputFile);
+
+        FrameRecorder recorder = null;
+        if (recordFile != null) {
+            recorder = FrameRecorder.createDefault(recordFile, w, h);
+            recorder.setFrameRate(15);
+            recorder.setVideoQuality(1.0);
+            recorder.start();
+        }
 
         //grabber = new FFmpegFrameGrabber(sourceVideoFile);
         int frameFileIndex = start_frame_no;
         int init_counter = 0;
         int frameNum = 0;
+
+        int totalVOL = 0;
 
         if (show_track == 1) {
             cvNamedWindow("DenseTrack");
@@ -129,15 +154,39 @@ public class FeatureExtra {
             while (frameFileIndex <= end_frame_no) {
                 //TODO: caution on the change of the frameNumber
                 //frameNum = capture.getFrameIndex();
-                frameNum++;
                 int i, j, c;
 
                 //String fileName = sourceVideoFolder + "Seq01_color\\" + String.format("frame%06d.jpg", frameFileIndex);
                 String fileName = sourceVideoFolder + String.format("%s%06d.jpg", filePrefix, frameFileIndex);
-                System.out.println(fileName);
+//                System.out.println(fileName);
                 IplImage ppimage = cvLoadImage(fileName);
                 frame = cvCreateImage(cvSize(inWidth, inHeight), nDepth, nChannel);
                 opencv_imgproc.cvResize(ppimage, frame, opencv_imgproc.CV_INTER_AREA);
+
+
+//                opencv_core.Mat matOrg = opencv_highgui.imread(fileName, opencv_highgui.CV_LOAD_IMAGE_COLOR);
+//                opencv_core.Mat matOrg = new opencv_core.Mat(ppimage);
+//                byte[] bData = tools.Serializable.CvMat2ByteArray(matOrg);
+
+//                BufferedImage bufferedImage = matOrg.getBufferedImage();
+//                tools.Serializable.Mat sMat = new tools.Serializable.Mat(matOrg);
+//                byte[] bData = sMat.toByteArray();
+
+//                tools.Serializable.Mat rMat = new tools.Serializable.Mat(bData);
+//                opencv_core.Mat newMat = tools.Serializable.ByteArray2CvMat(bData);
+//                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//                ImageIO.write(bufferedImage, "JPEG", baos);
+//                byte[] bData =  baos.toByteArray();
+
+//                BufferedImage bufferedImageRead = ImageIO.read(new ByteArrayInputStream(bData));
+//                opencv_core.Mat matNew = new opencv_core.Mat();
+//                matNew.copyFrom(bufferedImageRead);
+//
+//                //IplImage tttttImpage = cvDecodeImage(cvMat(1, bData.length, CV_8UC1, new BytePointer(bData)));
+//                IplImage tttttImpage = newMat.asIplImage();
+//                frame = cvCreateImage(cvSize(inWidth, inHeight), nDepth, nChannel);
+//                opencv_imgproc.cvResize(tttttImpage, frame, opencv_imgproc.CV_INTER_AREA);
+
 
                 if (frameNum >= start_frame && frameNum <= end_frame) {
                     if (image == null) {
@@ -186,14 +235,13 @@ public class FeatureExtra {
                     if (frameNum > 0) {
                         init_counter++;
                         //System.out.println("Step1_fID: " + frameFileIndex + ", init_counter: " + init_counter);
-                        System.out.println("frameID: " + frameFileIndex + ", timeStamp: " + System.currentTimeMillis());
                         for (int ixyScale = 0; ixyScale < scale_num; ixyScale++) {
                             LinkedList<CvPoint2D32f> points_in = new LinkedList<>();
                             LinkedList<Track> tracks = xyScaleTracks.get(ixyScale);
 
                             for (int tempI = 0; tempI < tracks.size(); tempI++) {
                                 Track iTrack = tracks.get(tempI);
-                                //TODO: double check!!!
+                                //TODO: double check_double!!!
                                 //CvPoint2D32f point = iTrack.pointDescs.getLast().point;
                                 CvPoint2D32f point = new CvPoint2D32f(iTrack.pointDescs.getLast().point);
 
@@ -213,10 +261,27 @@ public class FeatureExtra {
 //                            cvShowImage("DenseTrack", flow);
 //                            c = cvWaitKey(3);
 
+//                            CvPoint2D32f testP = new CvPoint2D32f();
+//                            testP.x(95.69521f);
+//                            testP.y(21.003756f);
+//                            OpticalFlowTrackerSimple(flow, testP);
+
+//                            Mat fMat = new Mat(flow);
+//                            tools.Serializable.Mat sfMat = new tools.Serializable.Mat(fMat);
+//
+//                            opencv_core.Mat orgMat = sfMat.toJavaCVMat();
+//                            IplImage newflow = orgMat.asIplImage();
+
+
                             Object[] pOutWithStatus = OpticalFlowTrackerSimple(flow, points_in);
                             LinkedList<CvPoint2D32f> points_out = (LinkedList<CvPoint2D32f>) pOutWithStatus[0];
                             int[] status = (int[]) pOutWithStatus[1];
-
+                            int falseStatusCnt = 0;
+                            for (int fs = 0; fs < status.length; fs++) {
+                                if (status[fs] == 0) {
+                                    falseStatusCnt++;
+                                }
+                            }
 
                             //System.out.println("Step2_fID: " + frameFileIndex
                             //        + ", s: " + ixyScale
@@ -275,6 +340,25 @@ public class FeatureExtra {
                                             //CV_RGB(0, cvFloor(255.0 * (j + 1.0) / length), 0), 0.5, 8, 0);
                                             cvLine(image, cvPointFrom32f(point0), cvPointFrom32f(point1),
                                                     CV_RGB(0, cvFloor(255.0 * (jIndex + 1.0) / length), 0), 1, 8, 0);
+
+                                            CvFont font = new CvFont();
+                                            cvInitFont(font, CV_FONT_ITALIC, 0.5f, 0.5f, 0, 1, 8);
+
+                                            CvPoint showPos = cvPoint(10, 20);
+                                            CvScalar showColor = CV_RGB(0, 0, 0);
+
+                                            cvPutText(image, "frameID: " + frameNum, showPos, font, showColor);
+                                            int xSt = 5;
+                                            int ySt = 100;
+                                            int xWid = 5;
+                                            int yWid = 10;
+                                            for (int ii = 0; ii < 5; ii ++) {
+                                                if (ii < 2) {
+                                                    cvRectangle(image, cvPoint(xSt + ii * xWid, ySt), cvPoint(xSt + (ii + 1) * xWid, ySt + yWid), opencv_core.CvScalar.GREEN, -1, 8, 0);
+                                                } else {
+                                                    cvRectangle(image, cvPoint(xSt + ii * xWid, ySt), cvPoint(xSt + (ii + 1) * xWid, ySt + yWid), opencv_core.CvScalar.GREEN, 1, 8, 0);
+                                                }
+                                            }
                                             point0 = point1;
                                         }
                                     }
@@ -288,6 +372,8 @@ public class FeatureExtra {
                                     //        + ", pout.size(): " + points_out.size());
                                 }
                             }
+//                            System.out.println("frameID: " + frameNum + ", optFlowTrakerbefore: " + tSize + ", after: " + tracks.size() + ",statusLen: " + status.length + ",fsCnt: " + falseStatusCnt);
+
                             //ReleDescMat(hogMat);
                             //ReleDescMat(hofMat);
                             //ReleDescMat(mbhMatX);
@@ -295,6 +381,7 @@ public class FeatureExtra {
                             cvReleaseImage(prev_grey_temp);
                             cvReleaseImage(grey_temp);
                             cvReleaseImage(flow);
+
                         }
 
                         //output
@@ -325,7 +412,31 @@ public class FeatureExtra {
 
                                     if (indicator == 1) {
                                         indCnt++;
+                                        totalVOL++;
                                         //System.out.println("Processing track in frame " + frameFileIndex);
+
+//                                        if (false) {
+//                                            for (int kk = 0; kk < iTrack.pointDescs.size(); kk++) {
+//                                                System.out.print("(" + iTrack.pointDescs.get(kk).point.x() + "," + iTrack.pointDescs.get(kk).point.y() + ")->");
+//                                            }
+//                                            System.out.println();
+//                                            System.out.print("mbhXRaw->");
+//                                            for (int kk = 0; kk < iTrack.pointDescs.size(); kk++) {
+//                                                System.out.print(iTrack.pointDescs.get(kk).mbhX[0] + "->");
+//                                            }
+//                                            System.out.println();
+//                                            System.out.print("mbhYRaw->");
+//                                            for (int kk = 0; kk < iTrack.pointDescs.size(); kk++) {
+//                                                System.out.print(iTrack.pointDescs.get(kk).mbhY[0] + "->");
+//                                            }
+//                                            System.out.println();
+//                                            System.out.print("hogRaw->");
+//                                            for (int kk = 0; kk < iTrack.pointDescs.size(); kk++) {
+//                                                System.out.print(iTrack.pointDescs.get(kk).hog[0] + "->");
+//                                            }
+//                                            System.out.println();
+//                                        }
+
 
                                         float[] Track_Info = new float[]{
                                                 (float) frameNum, vals[0], vals[1], vals[2], vals[3], vals[4], fscales[ixyScale]};
@@ -342,6 +453,7 @@ public class FeatureExtra {
 
                                         }
 
+//                                        System.out.print("HogSum->");
                                         List<Float> hogFeature = new ArrayList<>();
                                         int t_stride = cvFloor(tracker.trackLength / hogInfo.ntCells);
                                         int iDescIndex = 0;
@@ -357,9 +469,11 @@ public class FeatureExtra {
                                                 }
                                             }
                                             for (int m = 0; m < mbhInfo.dim; m++) {
+//                                                System.out.print(vec[m] + "->");
                                                 hogFeature.add(vec[m] / (float) t_stride);
                                             }
                                         }
+//                                        System.out.println();
 
                                         //float[] mbhdescr = new float[mbhInfo.dim + mbhInfo.dim];
                                         /*
@@ -378,6 +492,7 @@ public class FeatureExtra {
                                         }
                                         */
 
+//                                        System.out.print("mbhXSum->");
                                         //TODO: caution, different to the c++ code
                                         List<Float> mbhFeature = new ArrayList<>();
                                         t_stride = cvFloor(tracker.trackLength / mbhInfo.ntCells);
@@ -394,10 +509,13 @@ public class FeatureExtra {
                                                 }
                                             }
                                             for (int m = 0; m < mbhInfo.dim; m++) {
+//                                                System.out.print(vec[m] + "->");
                                                 mbhFeature.add(vec[m] / (float) t_stride);
                                             }
                                         }
+//                                        System.out.println();
 
+//                                        System.out.print("mbhYSum->");
                                         //TODO: caution, this is a bug, we miss the Y part!!!
                                         t_stride = cvFloor(tracker.trackLength / mbhInfo.ntCells);
                                         iDescIndex = 0;
@@ -406,18 +524,19 @@ public class FeatureExtra {
                                             for (int m = 0; m < mbhInfo.dim; m++) {
                                                 vec[m] = 0;
                                             }
-                                            for (int t = 0; t < t_stride; t++) {
+                                            for (int t = 0; t < t_stride; t++, iDescIndex++) {
                                                 PointDesc iDesc = iTrack.pointDescs.get(iDescIndex);
                                                 for (int m = 0; m < mbhInfo.dim; m++) {
                                                     vec[m] += iDesc.mbhY[m];
                                                 }
                                             }
                                             for (int m = 0; m < mbhInfo.dim; m++) {
+//                                                System.out.print(vec[m] + "->");
                                                 mbhFeature.add(vec[m] / (float) t_stride);
                                             }
                                         }
-
-                                        WriteTrajFeature2Txt(myfile, Track_Info, XYs, hogFeature, mbhFeature);
+//                                        System.out.println();
+//                                        WriteTrajFeature2Txt(myfile, Track_Info, XYs, hogFeature, mbhFeature);
                                         //System.out.println("\n");
                                     }
                                     //*///
@@ -431,6 +550,8 @@ public class FeatureExtra {
 //                            System.out.println("OP_FID: " + frameFileIndex
 //                                    + ", tSizeB: " + tSizeBefore + ", tSizeA: " + tracks.size()
 //                                    + ", indSize: " + indCnt + ", removeSize: " + removeSize);
+//                            System.out.println("frameID: " + frameNum + ",traceCntAfter: " + tracks.size() + ",ol: " + removeSize + ",olv: " + indCnt + ", totOLV: " + totalVOL);
+
                         }
 
                         if (init_counter == tracker.initGap) {
@@ -445,6 +566,14 @@ public class FeatureExtra {
                                     Track iTrack = tracks.get(i);
                                     CvPoint2D32f point = new CvPoint2D32f(iTrack.pointDescs.getLast().point);
                                     points_in.addLast(point);
+
+//                                    if (iTrack.pointDescs.get(0).point.y() == 22.0f) {
+//                                        System.out.print("len-" + iTrack.pointDescs.size() + "-");
+//                                        for (int kk = 0; kk < iTrack.pointDescs.size(); kk++) {
+//                                            System.out.print("(" + iTrack.pointDescs.get(kk).point.x() + "," + iTrack.pointDescs.get(kk).point.y() + ")->");
+//                                        }
+//                                        System.out.println();
+//                                    }
                                 }
 
                                 IplImage grey_temp = cvCloneImage(grey_pyramid.getImage(ixyScale));
@@ -453,12 +582,16 @@ public class FeatureExtra {
                                 LinkedList<CvPoint2D32f> points_out =
                                         cvDenseSample(grey_temp, eig_temp, points_in, quality, min_distance);
 
+//                                System.out.print("frameID: " + frameNum + ", newTraceAdded: " + points_out.size() + "-");
+
                                 for (i = 0; i < points_out.size(); i++) {
+//                                    System.out.print("(" + points_out.get(i).x() + "," + points_out.get(i).y() + ")-");
                                     Track track = new Track(tracker.trackLength);
                                     PointDesc point = new PointDesc(mbhInfo, hogInfo, points_out.get(i));
                                     track.addPointDesc(point);
                                     tracks.addLast(track);
                                 }
+//                                System.out.println();
 
 
                                 cvReleaseImage(grey_temp);
@@ -470,6 +603,7 @@ public class FeatureExtra {
                     cvCopy(frame, prev_image, null);
                     opencv_imgproc.cvCvtColor(prev_image, prev_grey, opencv_imgproc.CV_BGR2GRAY);
                     prev_grey_pyramid.rebuild(prev_grey);
+                    frameNum++;
                 }
 
                 if (show_track == 1) {
@@ -479,9 +613,16 @@ public class FeatureExtra {
                         break;
                     }
                 }
+                if (recordFile != null) {
+                    recorder.record(image);
+                }
                 frameFileIndex++;
             }
             myfile.close();
+            if (recordFile != null) {
+                recorder.stop();
+                recorder.release();
+            }
 
             if (show_track == 1) {
                 cvDestroyWindow("DenseTrack");
@@ -506,13 +647,13 @@ public class FeatureExtra {
         double[] maxVal = new double[1];
         maxVal[0] = 0.0;
         opencv_imgproc.cvCornerMinEigenVal(grey, eig, 3, 3);
-        //TODO: here need to be careful check with original c++ code.
+        //TODO: here need to be careful check_double with original c++ code.
         //cvMinMaxLoc(eig, 0, &maxVal, 0, 0, 0);
         cvMinMaxLoc(eig, null, maxVal, null, null, null);
         double threshold = maxVal[0] * quality;
 
 
-        opencv_core.Mat eigMat = new opencv_core.Mat(eig);
+        //opencv_core.Mat eigMat = new opencv_core.Mat(eig);
 
         int offset = cvFloor(min_distance / 2.0);
         //TODO:: is the calculation of "ve" correct?
@@ -523,8 +664,8 @@ public class FeatureExtra {
                 int y = cvFloor(i * min_distance + offset);
                 //int index = j * eig.widthStep() + eig.nChannels() * i;
                 //int index = y * eig.widthStep() + x;
-                //TODO:: caution, as explained by Peiyong, each row width is not dividable by size of float (4 bytes)
-                //There fore, we need to go to the target row first, then get the col.
+                //TODO:: caution, as explained by Peiyong, each aveDim width is not dividable by size of float (4 bytes)
+                //There fore, we need to go to the target rows first, then get the cols.
 
                 //FloatBuffer floatBuffer = eigMat.createBuffer(y * eigMat.arrayWidth());
 
@@ -552,7 +693,7 @@ public class FeatureExtra {
         double[] maxVal = new double[1];
         maxVal[0] = 0.0;
         opencv_imgproc.cvCornerMinEigenVal(grey, eig, 3, 3);
-        //TODO: here need to be careful check with original c++ code.
+        //TODO: here need to be careful check_double with original c++ code.
         //cvMinMaxLoc(eig, 0, &maxVal, 0, 0, 0);
         cvMinMaxLoc(eig, null, maxVal, null, null, null);
         double threshold = maxVal[0] * quality;
@@ -696,31 +837,19 @@ public class FeatureExtra {
 
 
             FloatBuffer floatBuffer = flow.getByteBuffer(q * flow.widthStep()).asFloatBuffer();
-            float[] fData = new float[width * 2];
-            floatBuffer.get(fData);
+//            float[] fData = new float[width * 2];
+//            floatBuffer.get(fData);
 
-
-            ByteBuffer bb = flow.getByteBuffer(q * flow.widthStep());
-            //byte[] data = new byte[flow.widthStep()];
-            //bb.get(data);
-//
-//            byte[] newData = new byte[data.length];
-//            newData = Arrays.copyOf(data, data.length);
-//
-//
-//            FloatBuffer floatBuffer = ByteBuffer.wrap(newData).asFloatBuffer();
-
-//            FloatBuffer floatBuffer = bb.asFloatBuffer();
-            //FloatBuffer floatBuffer = flow.getByteBuffer(q * flow.widthStep()).asFloatBuffer();
+//            FloatBuffer floatBuffer = flow.getByteBuffer(q * flow.widthStep()).asFloatBuffer();
             int xsIndex = 2 * p;
             int ysIndex = 2 * p + 1;
 
             CvPoint2D32f point_out = new CvPoint2D32f();
-//            point_out.x(point_in.x() + floatBuffer.get(xsIndex));
-//            point_out.y(point_in.y() + floatBuffer.get(ysIndex));
+            point_out.x(point_in.x() + floatBuffer.get(xsIndex));
+            point_out.y(point_in.y() + floatBuffer.get(ysIndex));
 
-            point_out.x(point_in.x() + fData[xsIndex]);
-            point_out.y(point_in.y() + fData[ysIndex]);
+//            point_out.x(point_in.x() + fData[xsIndex]);
+//            point_out.y(point_in.y() + fData[ysIndex]);
 
 
             //TODO: note we used a different approach than the c++ version
@@ -732,6 +861,112 @@ public class FeatureExtra {
             }
         }
         return new Object[]{points_out, status};
+    }
+
+//    public static Object[] OpticalFlowTrackerSimple(IplImage flow, LinkedList<CvPoint2D32f> points_in) {
+//        LinkedList<CvPoint2D32f> points_out = new LinkedList<>();
+//        int[] status = new int[points_in.size()];
+//
+//        int taskCnt = 4;
+//        List<float[]> groups0 = new ArrayList<>();
+//        List<float[]> groups1 = new ArrayList<>();
+//        List<float[]> groups2 = new ArrayList<>();
+//        List<float[]> groups3 = new ArrayList<>();
+//        for (int h = 0; h < flow.height(); h++) {
+//            //FloatBuffer floatBuffer = flow.getByteBuffer(h * flow.widthStep()).asFloatBuffer();
+//            FloatBuffer floatBuffer = flow.getByteBuffer(h * flow.widthStep()).asFloatBuffer();
+//            float[] floatArray = new float[flow.width() * 2];
+//            floatBuffer.get(floatArray);
+//
+//            if (h % taskCnt == 0) {
+//                groups0.add(floatArray);
+//            } else if (h % taskCnt == 1) {
+//                groups1.add(floatArray);
+//            } else if (h % taskCnt == 2) {
+//                groups2.add(floatArray);
+//            } else if (h % taskCnt == 3) {
+//                groups3.add(floatArray);
+//            }
+//        }
+//
+//        for (int i = 0; i < points_in.size(); i++) {
+//            CvPoint2D32f pOut = null;
+//            int q = Math.min(Math.max(cvFloor(points_in.get(i).y()), 0), flow.height() - 1);
+//            if (q % taskCnt == 0) {
+//                pOut = getNextFlowPointSimple(groups0, flow.width(), flow.height(), points_in.get(i), taskCnt);
+//            } else if (q % taskCnt == 1) {
+//                pOut = getNextFlowPointSimple(groups1, flow.width(), flow.height(), points_in.get(i), taskCnt);
+//            } else if (q % taskCnt == 2) {
+//                pOut = getNextFlowPointSimple(groups2, flow.width(), flow.height(), points_in.get(i), taskCnt);
+//            } else if (q % taskCnt == 3) {
+//                pOut = getNextFlowPointSimple(groups3, flow.width(), flow.height(), points_in.get(i), taskCnt);
+//            }
+//
+//            status[i] = pOut == null ? -1 : 1;
+//            points_out.addLast(pOut);
+//        }
+//
+//        return new Object[]{points_out, status};
+//    }
+
+    public static CvPoint2D32f OpticalFlowTrackerSimple(IplImage flow, CvPoint2D32f point_in) {
+
+        int width = flow.width();
+        int height = flow.height();
+
+
+        int p = Math.min(Math.max(cvFloor(point_in.x()), 0), width - 1);
+        int q = Math.min(Math.max(cvFloor(point_in.y()), 0), height - 1);
+
+
+        FloatBuffer floatBuffer = flow.getByteBuffer(q * flow.widthStep()).asFloatBuffer();
+        float[] fData = new float[width * 2];
+        floatBuffer.get(fData);
+
+        int xsIndex = 2 * p;
+        int ysIndex = 2 * p + 1;
+
+        CvPoint2D32f point_out = new CvPoint2D32f();
+
+        point_out.x(point_in.x() + fData[xsIndex]);
+        point_out.y(point_in.y() + fData[ysIndex]);
+
+//        System.out.println("(" + point_in.x() + "," + point_in.y() + "," + p + "," + q + "," + xsIndex + "," + ysIndex
+//                + "," + floatBuffer.get(xsIndex) + "," + floatBuffer.get(ysIndex) + ")->(" + +point_out.x() + "," + point_out.y() + ")");
+
+        if (point_out.x() > 0 && point_out.x() < width && point_out.y() > 0 && point_out.y() < height) {
+            return point_out;
+        } else {
+            return null;
+        }
+    }
+
+    public static CvPoint2D32f getNextFlowPointSimple(List<float[]> floatArray, int width, int height, CvPoint2D32f point_in, int taskCnt) {
+
+        //TODO:!!!!be careful!!!
+        int p = Math.min(Math.max(cvFloor(point_in.x()), 0), width - 1);
+        int q = Math.min(Math.max(cvFloor(point_in.y()), 0), height - 1);
+
+//        int p = Math.min(Math.max(cvRound(point_in.x()), 0), width - 1);
+//        int q = Math.min(Math.max(cvRound(point_in.y()), 0), height - 1);
+
+        int rowIndex = q / taskCnt;
+        float[] fData = floatArray.get(rowIndex);
+        //FloatBuffer floatBuffer = ByteBuffer.wrap(data).asFloatBuffer();
+
+        //FloatBuffer floatBuffer = flow.getByteBuffer(q * flow.widthStep()).asFloatBuffer();
+        int xsIndex = 2 * p;
+        int ysIndex = 2 * p + 1;
+
+        CvPoint2D32f point_out = new CvPoint2D32f();
+        point_out.x(point_in.x() + fData[xsIndex]);
+        point_out.y(point_in.y() + fData[ysIndex]);
+
+        if (point_out.x() > 0 && point_out.x() < width && point_out.y() > 0 && point_out.y() < height) {
+            return point_out;
+        } else {
+            return null;
+        }
     }
 
     //We have re-organized the input and output to the oringal c++ version

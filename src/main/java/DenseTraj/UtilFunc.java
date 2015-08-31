@@ -86,7 +86,7 @@ public class UtilFunc {
         double[] maxVal = new double[1];
         maxVal[0] = 0.0;
 
-        //TODO: here need to be careful check with original c++ code.
+        //TODO: here need to be careful check_double with original c++ code.
         //minMaxLoc(eig, 0, &maxVal);
         opencv_core.minMaxLoc(eig, null, maxVal, null, null, null);
         //cvMinMaxLoc(eig, 0, &maxVal, 0, 0, 0);

@@ -40,7 +40,8 @@ public class Serializable {
             return type;
         }
 
-        public Mat(){}
+        public Mat() {
+        }
 
         /**
          * Creates new serializable Mat given its format and data.
@@ -59,6 +60,7 @@ public class Serializable {
 
         /**
          * Creates new serializable Mat given its format and data.
+         *
          * @param input Byte data containing image.
          */
         public Mat(byte[] input) {
@@ -75,7 +77,7 @@ public class Serializable {
                 while (readed < size) {
                     readed += in.read(data, readed, size - readed);
                 }
-                System.out.println("in: " + this.rows + "-" + this.cols + "-" + this.type + "-" + size + "-" + readed);
+                System.out.println("in: " + this.rows + "-" + this.cols + "-" + this.type + "-" + input.length + "-" + size + "-" + readed);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -112,7 +114,7 @@ public class Serializable {
         }
 
 
-        public byte[] toByteArray(){
+        public byte[] toByteArray() {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             ObjectOutput out = null;
             try {
@@ -145,7 +147,8 @@ public class Serializable {
          */
         public int x, y, width, height;
 
-        public Rect(){}
+        public Rect() {
+        }
 
         public Rect(opencv_core.Rect rect) {
             x = rect.x();
@@ -204,7 +207,8 @@ public class Serializable {
          */
         public Rect roi;
 
-        public PatchIdentifier(){}
+        public PatchIdentifier() {
+        }
 
         /**
          * Creates PatchIdentifier with given frame id and rectangle.
@@ -253,30 +257,89 @@ public class Serializable {
         float x;
         float y;
 
-        public CvPoint2D32f(){}
-        public CvPoint2D32f(opencv_core.CvPoint2D32f p){
+        public CvPoint2D32f() {
+        }
+
+        public CvPoint2D32f(opencv_core.CvPoint2D32f p) {
             this.x = p.x();
             this.y = p.y();
         }
 
-        public CvPoint2D32f(CvPoint2D32f p){
+        public CvPoint2D32f(CvPoint2D32f p) {
             this.x = p.x();
             this.y = p.y();
         }
 
-        public opencv_core.CvPoint2D32f toJavaCvPoint2D32f(){
+        public opencv_core.CvPoint2D32f toJavaCvPoint2D32f() {
             return new opencv_core.CvPoint2D32f().x(this.x).y(this.y);
         }
 
-        public float x(){
+        public float x() {
             return this.x;
         }
 
-        public float y(){
+        public float y() {
             return this.y;
         }
 
-        public void x(float x){this.x = x;}
-        public void y(float y){this.y = y;}
+        public void x(float x) {
+            this.x = x;
+        }
+
+        public void y(float y) {
+            this.y = y;
+        }
     }
+
+    public static byte[] CvMat2ByteArray(opencv_core.Mat mat) {
+        if (!mat.isContinuous()) {
+            mat = mat.clone();
+        }
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ObjectOutput out = null;
+        try {
+            out = new ObjectOutputStream(bos);
+            out.writeInt(mat.rows());
+            out.writeInt(mat.cols());
+            out.writeInt(mat.type());
+            out.writeInt(mat.arraySize());
+
+            byte[] data = new byte[mat.arraySize()];
+            mat.getByteBuffer().get(data);
+            out.write(data);
+            out.close();
+            byte[] int_bytes = bos.toByteArray();
+            bos.close();
+
+            //System.out.println("out: " + this.rows + "-" + this.cols + "-" + this.type + "-" + this.data.length + "-" + int_bytes.length);
+            return int_bytes;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static opencv_core.Mat ByteArray2CvMat(byte[] input){
+        ByteArrayInputStream bis = new ByteArrayInputStream(input);
+        ObjectInput in = null;
+        try {
+            in = new ObjectInputStream(bis);
+            int rows = in.readInt();
+            int cols = in.readInt();
+            int type = in.readInt();
+            int size = in.readInt();
+            byte[] data = new byte[size];
+            int readed = 0;
+            while (readed < size) {
+                readed += in.read(data, readed, size - readed);
+            }
+
+            return new opencv_core.Mat(rows, cols, type, new BytePointer(data));
+//            System.out.println("in: " + this.rows + "-" + this.cols + "-" + this.type + "-" + input.length + "-" + size + "-" + readed);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 }

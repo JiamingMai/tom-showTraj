@@ -117,7 +117,7 @@ public class StormVideoLogoDetectorGamma {
 
         // This is the index of the original logo templates
         try {
-            ///TODO: double check, Fixed by Tom fu on April, 2015, the original case always throws IO exceptions
+            ///TODO: double check_double, Fixed by Tom fu on April, 2015, the original case always throws IO exceptions
             //Mat tmp = new Mat(IplImage.createFrom(ImageIO.read(new FileInputStream(fileName))));
             Mat tmp = new Mat(cvLoadImage(fileName));
             //opencv_core.Mat matOrg = opencv_highgui.imread(fileName, opencv_highgui.CV_LOAD_IMAGE_COLOR);

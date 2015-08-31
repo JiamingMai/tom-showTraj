@@ -5,9 +5,13 @@ package GmmModel;
  */
 public class VlGMM_double {
 
-    static double VL_GMM_MIN_VARIANCE = 1e-6;
-    static double VL_GMM_MIN_POSTERIOR = 1e-2;
-    static double VL_GMM_MIN_PRIOR = 1e-6;
+    static double VL_GMM_MIN_VARIANCE_D = 1e-6;
+    static double VL_GMM_MIN_POSTERIOR_D = 1e-2;
+    static double VL_GMM_MIN_PRIOR_D = 1e-6;
+
+    static double VL_GMM_MIN_VARIANCE_F = 1e-6;
+    static double VL_GMM_MIN_POSTERIOR_F = 1e-2;
+    static double VL_GMM_MIN_PRIOR_F = 1e-6;
 
     static enum VlGMMInitialization {VlGMMKMeans, VlGMMRand, VlGMMCustom};
 
