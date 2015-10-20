@@ -3,6 +3,7 @@ package GmmModel;
 import com.google.common.collect.HashMultiset;
 import redis.clients.jedis.Jedis;
 
+import javax.swing.text.html.parser.Entity;
 import java.io.*;
 import java.util.*;
 
@@ -18,19 +19,42 @@ public class newMethod {
 
     static double VL_GMM_MIN_PRIOR_F = 1e-6;
 
+//    public static void mainTest(String[] args) {
+//        Map<String, Double> results = new HashMap();
+//        results.put("v_Skiing_g21_c05", 0.04);
+//        results.put("v_Skiing_g23_c02", 0.03);
+//        results.put("v_Biking_g24_c04", 0.01);
+//        results.put("v_BoxingPunchingBag_g21_c01", 0.09);
+//        results.put("v_Drumming_g24_c04", 0.08);
+//        results.put("v_JumpingJack_g22_c02", 0.07);
+//
+//        results.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).filter(e -> e.getValue() > 0.02).forEach(e -> System.out.println(e));
+//    }
+
     public static void main(String[] args) {
 
         String inputFilePath = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\";
-        String hogPcaFile = inputFilePath + "KTHDemo2\\codebook\\hog_pca.mat";
-        String mbhxPcaFile = inputFilePath + "KTHDemo2\\codebook\\mbhx_pca.mat";
-        String mbhyPcaFile = inputFilePath + "KTHDemo2\\codebook\\mbhy_pca.mat";
-        String hogGmmFile = inputFilePath + "KTHDemo2\\codebook\\hog_gmm.codebook";
-        String mbhxGmmFile = inputFilePath + "KTHDemo2\\codebook\\mbhx_gmm.codebook";
-        String mbhyGmmFile = inputFilePath + "KTHDemo2\\codebook\\mbhy_gmm.codebook";
 
-        String modelFile = inputFilePath + "KTHDemo2\\KTHDemo2_row.model";
+        String demoFolder = "ucf101-Demo";
 
-        String dataFileFolder = inputFilePath + "trajsTest-new";
+        String hogPcaFile = inputFilePath + demoFolder + "\\codebook\\hog_pca.mat";
+        String mbhxPcaFile = inputFilePath + demoFolder + "\\codebook\\mbhx_pca.mat";
+        String mbhyPcaFile = inputFilePath + demoFolder + "\\codebook\\mbhy_pca.mat";
+        String hogGmmFile = inputFilePath + demoFolder + "\\codebook\\hog_gmm.codebook";
+        String mbhxGmmFile = inputFilePath + demoFolder + "\\codebook\\mbhx_gmm.codebook";
+        String mbhyGmmFile = inputFilePath + demoFolder + "\\codebook\\mbhy_gmm.codebook";
+
+//        String modelFile = inputFilePath + demoFolder + "\\KTHDemo2_row.model";
+        String modelFile = inputFilePath + demoFolder + "\\ucf101_demo_row.model";
+        String classNameFile = inputFilePath + demoFolder + "\\ucf101_subset_labels.txt";
+
+        List<String> classNameDic = getClassNames(classNameFile);
+        for (int i = 0; i < classNameDic.size(); i ++){
+            System.out.println("i: " + i + ", " + classNameDic.get(i));
+        }
+
+//        String dataFileFolder = inputFilePath + "trajsTest-new";
+        String dataFileFolder = inputFilePath + "testForUcf101";
 
         int numDimension = 288;
         int numCluster = 256;
@@ -75,11 +99,14 @@ public class newMethod {
 //        float maxSimilarity = (float) classifyRestult[1];
 //        System.out.println("numData: " + numData + ", maxIndex: " + maxIndex + ", maxSim: " + maxSimilarity);
 
-        HashMap results = checkNew_float(dataFileFolder, trainingResult, numDimension, hogPca, mbhxPca, mbhyPca, hogGmm, mbhxGmm, mbhyGmm);
+        Map<String, Float> results = checkNew_float(dataFileFolder, trainingResult, numDimension, hogPca, mbhxPca, mbhyPca, hogGmm, mbhxGmm, mbhyGmm, classNameDic);
 
-        results.forEach((k, v)-> {if ((float)v > 0.6f) {
-            System.out.println(k + "," +  v);
-        }});
+        results.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).filter(e -> e.getValue() > 0.6f).forEach(e -> System.out.println(e));
+
+//        System.out.println("results > 0.6f");
+//        results.forEach((k, v)-> {if ((float)v > 0.6f) {
+//            System.out.println(k + "," +  v);
+//        }});
 
 }
 
@@ -114,26 +141,29 @@ public class newMethod {
         return testClassID;
     }
 
-    public static HashMap checkNew_float(String testFileFolder, List<float[]> trainingResult, int numDimension,
-                                       PcaData hogPca, PcaData mbhxPca, PcaData mbhyPca, GmmData hogGmm, GmmData mbhxGmm, GmmData mbhyGmm) {
-        double acc = 0.0;
+    public static Map checkNew_float(String testFileFolder, List<float[]> trainingResult, int numDimension,
+                                       PcaData hogPca, PcaData mbhxPca, PcaData mbhyPca, GmmData hogGmm, GmmData mbhxGmm, GmmData mbhyGmm, List<String> classNameDictionary) {
         int totalCnt = 0;
         int accCnt = 0;
 
-        HashMap retVal = new HashMap();
+        Map<String, Float> retVal = new HashMap();
+
+        int[] classTotalCnt = new int[classNameDictionary.size()];
+        int[] classAccCnt = new int[classNameDictionary.size()];
 
         File folder = new File(testFileFolder);
         File[] listOfFiles = folder.listFiles();
         for (int i = 0; i < listOfFiles.length; i++) {
             File f = listOfFiles[i];
             if (f.isFile()) {
-                int orgClassID = getClassID(f.getName());
+                int orgClassID = getClassID(f.getName(), classNameDictionary);
                 if (orgClassID < 0) {
                     System.out.println("Warning, in check_double, orgClassID < 0, fileName: " + f.getName());
                     continue;
                 }
 
                 totalCnt++;
+                classTotalCnt[orgClassID] ++;
 
                 float[] rawData = getTrajDataFromFileNew_float(f.getAbsolutePath(), 327);
                 int numData = rawData.length / numDimension;
@@ -155,6 +185,7 @@ public class newMethod {
                 float similarity = (float) classifyRestult[1];
                 if (orgClassID == testClassID) {
                     accCnt++;
+                    classAccCnt[orgClassID]++;
                     System.out.println("File: " + f.getName() + ", orgClassID: " + orgClassID + ", testID: " + testClassID + ", sim: " + similarity);
 
                     retVal.put(f.getName(), similarity);
@@ -164,8 +195,12 @@ public class newMethod {
                 }
             }
         }
-        acc = totalCnt == 0 ? 0.0 : (double) accCnt / (double) totalCnt;
+        double acc = totalCnt == 0 ? 0.0 : (double) accCnt / (double) totalCnt;
         System.out.println("check_float, totalCnt: " + totalCnt + ", accCnt: " + accCnt + ", accuracy: " + acc);
+        for (int i = 0; i < classNameDictionary.size(); i ++){
+            double classAcc = classTotalCnt[i] == 0 ? 0.0 : (double) classAccCnt[i] / (double) classTotalCnt[i];
+            System.out.println("class: " + classNameDictionary.get(i) + ", classCnt: " + classTotalCnt[i] + ", classAccCnt: " + classAccCnt[i] + ", classAcc: " + classAcc);
+        }
         return retVal;
     }
 
@@ -601,6 +636,23 @@ public class newMethod {
         return new Object[]{posteriors, LL};
     }
 
+    public static List<String> getClassNames(String classNameFile){
+        List<String> retVal = new ArrayList<>();
+        try {
+            BufferedReader myfile = new BufferedReader(new FileReader(classNameFile));
+            String rdLine = null;
+            while ((rdLine = myfile.readLine()) != null) {
+                if (rdLine.length() > 0) {
+                    retVal.add(rdLine);
+                }
+            }
+            myfile.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return retVal;
+    }
+
     public static int getClassID(String fileName) {
         if (fileName.contains("boxing")) {
             return 0;
@@ -615,6 +667,15 @@ public class newMethod {
         } else if (fileName.contains("walking")) {
             return 5;
         } else return -1;
+    }
+
+    public static int getClassID(String fileName, List<String> classNameDictionary) {
+        for (int i = 0; i < classNameDictionary.size(); i ++){
+            if (fileName.contains(classNameDictionary.get(i))){
+                return i;
+            }
+        }
+        return -1;
     }
 
     public static List<float[]> getTrainingResult_float(String fileName, int checkLength) {

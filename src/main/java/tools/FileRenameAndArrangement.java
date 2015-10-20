@@ -11,13 +11,13 @@ import java.nio.file.Files;
  */
 public class FileRenameAndArrangement {
     public static void main(String[] args) {
-        String inputFileName = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\combine-for-test.txt";
+        String inputFileName = "C:\\Users\\Tom.fu\\Desktop\\ucf101subset\\combine-for-test.txt";
 
-        String outputFolder = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\combineAction\\";
+        String outputFolder = "C:\\Users\\Tom.fu\\Desktop\\ucf101subset\\combineAction\\";
 
-        String sourceFolder = "C:\\Users\\Tom.fu\\Desktop\\KTH\\";
+        String sourceFolder = "C:\\Users\\Tom.fu\\Desktop\\ucf101subset\\subset\\";
 
-        String filePrefix = "gray-";
+        String filePrefix = "frame";
         int totalLineCnt = 0;
         int overallIndex = 0;
         try {
@@ -26,10 +26,11 @@ public class FileRenameAndArrangement {
 
             while ((rdLine = br.readLine())!=null){
                 totalLineCnt ++;
-                String[] rdLineSplit = rdLine.split("_");
-                String folderName = rdLineSplit[1];
+//                String[] rdLineSplit = rdLine.split("_");
+//                String folderName = rdLineSplit[1];
 
-                String src = sourceFolder + folderName + "\\" + rdLine + "\\";
+//                String src = sourceFolder + folderName + "\\" + rdLine + "\\";
+                String src = sourceFolder + rdLine + "\\";
                 File folder = new File(src);
                 File[] listOfFiles = folder.listFiles();
                 int start_frame_no = 1;

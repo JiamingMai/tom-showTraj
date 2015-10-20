@@ -1,11 +1,14 @@
 package GenerateTraj;
 
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.FloatBuffer;
 import java.util.*;
 import java.util.Arrays;
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacv.FrameRecorder;
+
+import javax.imageio.ImageIO;
 
 import static org.bytedeco.javacpp.opencv_core.*;
 import static org.bytedeco.javacpp.opencv_core.cvCreateImage;
@@ -26,8 +29,11 @@ public class FeatureExtra {
     static int start_frame = 0;
     static int end_frame = 1000000;
     static double quality = 0.001;
-    static double min_distance = 5; //13;
-    static int init_gap = 1; //3;
+//    static double min_distance = 5; //13;
+//    static int init_gap = 1; //3;
+    static double min_distance = 13;
+    static int init_gap = 3;
+
     static int track_length = 15; //15; update (bingbing longer traj)
 
     static float min_var = (float) Math.sqrt(3.0);
@@ -64,13 +70,37 @@ public class FeatureExtra {
 
         long startTime = System.currentTimeMillis();
         System.out.println("new test, start at: " + startTime);
-        batchExtractingProcess(drawIndicator, sourceVideoFile + "boxing\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "boxing\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "drumming\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "fencing\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "floorGym\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "jumpingJack\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "jumpRope\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "lunges\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "nunchucks\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "playingCello\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "pommelHorse\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "skiing\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "sockerJuggling\\", outputTxtPath, filePrefix, w, h, null);
+//        batchExtractingProcess(drawIndicator, sourceVideoFile + "trampolineJumping\\", outputTxtPath, filePrefix, w, h, null);
+        //batchExtractingProcess(drawIndicator, sourceVideoFile, outputTxtPath, filePrefix, w, h, null);
 //        batchExtractingProcess(drawIndicator, sourceVideoFile + "handclapping\\", outputTxtPath, filePrefix, w, h, null);
 //        batchExtractingProcess(drawIndicator, sourceVideoFile + "handwaving\\", outputTxtPath, filePrefix, w, h, null);
 //        batchExtractingProcess(drawIndicator, sourceVideoFile + "jogging\\", outputTxtPath, filePrefix, w, h, null);
 //        batchExtractingProcess(drawIndicator, sourceVideoFile + "running\\", outputTxtPath, filePrefix, w, h, null);
 //        batchExtractingProcess(drawIndicator, sourceVideoFile + "walking\\", outputTxtPath, filePrefix, w, h, null);
 //        batchExtractingProcess(drawIndicator, sourceVideoFile + "walking2\\", outputTxtPath, filePrefix, w, h, null);
+
+
+        String inputFolder = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\Seq01_color\\";
+        String outputFileName = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\empty.txt";
+        filePrefix = "frame";
+        w = 640;
+        h = 480;
+        String outputFrameFolder = "C:\\Users\\Tom.fu\\Desktop\\fromPeiYong\\Seq01_color_traj\\";
+        FeatureDetectTrackingExtraction(2, inputFolder, outputFileName, filePrefix, w, h, null, false, outputFrameFolder);
+
+        FeatureDetectTrackingExtraction(2, inputFolder, outputFileName, filePrefix, w, h, null, false, outputFrameFolder);
 
         long endTime = System.currentTimeMillis();
         System.out.println("finished with duration: " + (endTime - startTime));
@@ -89,18 +119,22 @@ public class FeatureExtra {
                 totalDicCnt ++;
                 String inputFolder = sourceRootVideoFolder + f.getName() + "\\";
                 String outputFileName = outputFileFolder + f.getName() + ".txt";
-                FeatureDetectTrackingExtraction(show_track, inputFolder, outputFileName, filePrefix, w, h, null);
+                FeatureDetectTrackingExtraction(show_track, inputFolder, outputFileName, filePrefix, w, h, null, false, null);
+                System.gc();
             }
         }
         System.out.println("finishedRootFolder: " + sourceRootVideoFolder + ", totalTargetDicCnt: " + totalDicCnt);
     }
 
-    //Fixed a bug on Aug 5, 2015, mbhY info to file, the indexOfTraceNode is not ++
+    ///show_track == 1, draw in window and in file
+    ///show_track > 1, only generate frames, not drawing in a window
     public static void FeatureDetectTrackingExtraction(
-            int show_track, String sourceVideoFolder, String outputFile, String filePrefix, int w, int h, String recordFile) throws FrameRecorder.Exception {
+            int show_track, String sourceVideoFolder, String outputFile, String filePrefix, int w, int h,
+            String recordFile, boolean toOutputTrajInfo, String outputFrameFolder) throws FrameRecorder.Exception {
 
         opencv_core.IplImage frame = null;
         opencv_core.IplImage image = null;
+        opencv_core.IplImage newFrame = null;
         opencv_core.IplImage prev_image = null;
 
         opencv_core.IplImage grey = null;
@@ -258,20 +292,6 @@ public class FeatureExtra {
                             opencv_video.cvCalcOpticalFlowFarneback(prev_grey_temp, grey_temp, flow,
                                     Math.sqrt(2.0) / 2.0, 5, 10, 2, 7, 1.5, opencv_video.OPTFLOW_FARNEBACK_GAUSSIAN);
 
-//                            cvShowImage("DenseTrack", flow);
-//                            c = cvWaitKey(3);
-
-//                            CvPoint2D32f testP = new CvPoint2D32f();
-//                            testP.x(95.69521f);
-//                            testP.y(21.003756f);
-//                            OpticalFlowTrackerSimple(flow, testP);
-
-//                            Mat fMat = new Mat(flow);
-//                            tools.Serializable.Mat sfMat = new tools.Serializable.Mat(fMat);
-//
-//                            opencv_core.Mat orgMat = sfMat.toJavaCVMat();
-//                            IplImage newflow = orgMat.asIplImage();
-
 
                             Object[] pOutWithStatus = OpticalFlowTrackerSimple(flow, points_in);
                             LinkedList<CvPoint2D32f> points_out = (LinkedList<CvPoint2D32f>) pOutWithStatus[0];
@@ -282,12 +302,6 @@ public class FeatureExtra {
                                     falseStatusCnt++;
                                 }
                             }
-
-                            //System.out.println("Step2_fID: " + frameFileIndex
-                            //        + ", s: " + ixyScale
-                            //        + ", tSize: " + tracks.size()
-                            //        + ", pin.size(): " + points_in.size()
-                            //        + ", pout.size(): " + points_out.size());
 
                             int width = grey_temp.width();
                             int height = grey_temp.height();
@@ -317,7 +331,7 @@ public class FeatureExtra {
                                     PointDesc point = new PointDesc(mbhInfo, hogInfo, points_out.get(i));
                                     iTrack.addPointDesc(point);
 
-                                    if (show_track == 1) {
+                                    if (show_track > 0) {
                                         float length = iTrack.pointDescs.size();
 
                                         float point0_x = fscales[ixyScale] * iTrack.pointDescs.get(0).point.x();
@@ -340,27 +354,20 @@ public class FeatureExtra {
                                             //CV_RGB(0, cvFloor(255.0 * (j + 1.0) / length), 0), 0.5, 8, 0);
                                             cvLine(image, cvPointFrom32f(point0), cvPointFrom32f(point1),
                                                     CV_RGB(0, cvFloor(255.0 * (jIndex + 1.0) / length), 0), 1, 8, 0);
-
-                                            CvFont font = new CvFont();
-                                            cvInitFont(font, CV_FONT_ITALIC, 0.5f, 0.5f, 0, 1, 8);
-
-                                            CvPoint showPos = cvPoint(10, 20);
-                                            CvScalar showColor = CV_RGB(0, 0, 0);
-
-                                            cvPutText(image, "frameID: " + frameNum, showPos, font, showColor);
-                                            int xSt = 5;
-                                            int ySt = 100;
-                                            int xWid = 5;
-                                            int yWid = 10;
-                                            for (int ii = 0; ii < 5; ii ++) {
-                                                if (ii < 2) {
-                                                    cvRectangle(image, cvPoint(xSt + ii * xWid, ySt), cvPoint(xSt + (ii + 1) * xWid, ySt + yWid), opencv_core.CvScalar.GREEN, -1, 8, 0);
-                                                } else {
-                                                    cvRectangle(image, cvPoint(xSt + ii * xWid, ySt), cvPoint(xSt + (ii + 1) * xWid, ySt + yWid), opencv_core.CvScalar.GREEN, 1, 8, 0);
-                                                }
-                                            }
                                             point0 = point1;
                                         }
+//                                        newFrame = cvCreateImage(cvSize(320, 240), 8, 3);
+//                                        opencv_imgproc.cvResize(image, newFrame, opencv_imgproc.CV_INTER_AREA);
+//
+//                                        CvFont font = new CvFont();
+//                                        cvInitFont(font, CV_FONT_ITALIC, 0.5f, 0.5f, 0, 1, 8);
+//
+//                                        CvPoint showPos = cvPoint(10, 20);
+//                                        CvScalar showColor = CV_RGB(0, 0, 0);
+//
+//                                        cvPutText(newFrame, "frameID: " + frameNum, showPos, font, showColor);
+
+
                                     }
                                     tSizeCnt++;
                                 } else {
@@ -536,7 +543,9 @@ public class FeatureExtra {
                                             }
                                         }
 //                                        System.out.println();
-//                                        WriteTrajFeature2Txt(myfile, Track_Info, XYs, hogFeature, mbhFeature);
+                                        if (toOutputTrajInfo) {
+                                            WriteTrajFeature2Txt(myfile, Track_Info, XYs, hogFeature, mbhFeature);
+                                        }
                                         //System.out.println("\n");
                                     }
                                     //*///
@@ -608,6 +617,7 @@ public class FeatureExtra {
 
                 if (show_track == 1) {
                     cvShowImage("DenseTrack", image);
+                    //cvShowImage("DenseTrack", newFrame);
                     c = cvWaitKey(1);
                     if ((char) c == 27) {
                         break;
@@ -615,6 +625,17 @@ public class FeatureExtra {
                 }
                 if (recordFile != null) {
                     recorder.record(image);
+                }
+                if(show_track > 0 && outputFrameFolder != null){
+                    String outputFrameFile = outputFrameFolder + String.format("%s%06d.jpg", filePrefix, frameFileIndex);
+                    File initialImage = new File(outputFrameFile);
+                    try {
+                        opencv_core.Mat mat = new Mat(image);
+                        BufferedImage bufferedImage = mat.getBufferedImage();
+                        ImageIO.write(bufferedImage, "JPEG", initialImage);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
                 frameFileIndex++;
             }
@@ -737,7 +758,11 @@ public class FeatureExtra {
                 //FloatBuffer floatBuffer = eigMat.createBuffer(y * eigMat.arrayWidth());
 
                 FloatBuffer floatBuffer = eig.getByteBuffer(y * eig.widthStep()).asFloatBuffer();
+//                FloatBuffer floatBuffer2 = eig.createBuffer(y * eig.widthStep());
+//                float ve2 = floatBuffer2.get(x);
                 float ve = floatBuffer.get(x);
+//                System.out.println("test for new approach, fb1.get(x): "+ ve + ", ve2: " + ve2);
+
                 if (ve > threshold) {
                     totalSampled++;
                     if (counters[index] == 0) {
