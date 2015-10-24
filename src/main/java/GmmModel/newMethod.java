@@ -101,7 +101,8 @@ public class newMethod {
 
         Map<String, Float> results = checkNew_float(dataFileFolder, trainingResult, numDimension, hogPca, mbhxPca, mbhyPca, hogGmm, mbhxGmm, mbhyGmm, classNameDic);
 
-        results.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).filter(e -> e.getValue() > 0.6f).forEach(e -> System.out.println(e));
+        //results.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).filter(e -> e.getValue() > 0.6f).forEach(e -> System.out.println(e));
+        results.entrySet().stream().sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())).filter(e -> e.getValue() > 0.0f).forEach(e -> System.out.println(e));
 
 //        System.out.println("results > 0.6f");
 //        results.forEach((k, v)-> {if ((float)v > 0.6f) {
