@@ -856,6 +856,14 @@ public class newMethod {
             default: return "unknown";
         }
     }
+
+    public static String getClassificationString(int result, List<String> actionNames) {
+
+        if (result >= 0 && result < actionNames.size()){
+            return actionNames.get(result);
+        }
+        return "unknown";
+    }
 }
 
 
