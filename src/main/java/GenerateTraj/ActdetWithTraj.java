@@ -64,6 +64,7 @@ public class ActdetWithTraj {
         int winPosX = Integer.parseInt(args[0]);
         int winPosY = Integer.parseInt(args[1]);
 
+        ///for comparison demo, winPosX = 1200, winPosY = 113
         ActdetWithTrajDrawing(drawIndicator, inputFolder, outputFileName, filePrefix,
                 320, 240, 160, 120, 480, 360, winPosX, winPosY, null, false, null);
 
