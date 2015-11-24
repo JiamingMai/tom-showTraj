@@ -32,7 +32,7 @@ public class functionTest {
 
         System.out.println(a.toString());
 
-        List<Integer>x = new ArrayList<>(a.entrySet().stream().filter(e -> e.getKey().contains("a"))
+        List<Integer>x = new ArrayList<>(a.entrySet().stream().filter(e -> e.getKey().contains("b"))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)).values());
 
         System.out.println(x.toString());
